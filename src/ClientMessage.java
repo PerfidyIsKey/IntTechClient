@@ -17,6 +17,13 @@ public class ClientMessage {
         HELO,
         BCST,
         PONG,
+        WISP,
+        KICK,
+        GRPS,
+        JOIN,
+        USRS,
+        LEVE,
+        CRTE,
         QUIT;
 
         private MessageType() {

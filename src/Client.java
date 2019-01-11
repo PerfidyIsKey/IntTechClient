@@ -41,7 +41,7 @@ public class Client {
 
             while(true) {
                 if (!this.serverMessages.empty()) {
-                    ServerMessage serverMessage = (ServerMessage)this.serverMessages.pop();
+                    ServerMessage serverMessage = this.serverMessages.pop();
                     if (!serverMessage.getMessageType().equals(ServerMessage.MessageType.HELO)) {
                         System.out.println("Expecting a HELO message but received: " + serverMessage.toString());
                     } else {
@@ -52,23 +52,26 @@ public class Client {
                         this.clientMessages.push(heloMessage);
 
                         while(this.serverMessages.empty()) {
-                            ;
+
                         }
 
-                        this.isConnected = this.validateServerMessage(heloMessage, (ServerMessage)this.serverMessages.pop());
+                        this.isConnected = this.validateServerMessage(heloMessage, this.serverMessages.pop());
                         if (!this.isConnected) {
                             System.out.println("Error logging into server");
                         } else {
                             System.out.println("Successfully connected to server.");
                             System.out.println("(Type 'quit' to close connection and stop application.)");
-                            System.out.println("Type a broadcast message: ");
+                            System.out.println("Type a message: ");
                             this.nonblockReader = new NonblockingBufferedReader(new BufferedReader(new InputStreamReader(System.in)));
 
                             while(this.isConnected) {
                                 String line = this.nonblockReader.readLine();
                                 if (line != null) {
                                     ClientMessage clientMessage;
-                                    if (line.equals("quit")) {
+                                    if (line.startsWith("/w")) {
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.WISP, line);
+                                    }
+                                    else if (line.equals("quit")) {
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.QUIT, "");
                                         this.isConnected = false;
                                         Thread.sleep(500L);
@@ -77,11 +80,11 @@ public class Client {
                                     }
 
                                     this.clientMessages.push(clientMessage);
-                                    System.out.println("Type a broadcast message: ");
+                                    System.out.println("Type a message: ");
                                 }
 
                                 if (!this.serverMessages.empty()) {
-                                    ServerMessage received = (ServerMessage)this.serverMessages.pop();
+                                    ServerMessage received = this.serverMessages.pop();
                                     if (received.getMessageType().equals(ServerMessage.MessageType.BCST)) {
                                         System.out.println(received.getPayload());
                                     }
@@ -146,7 +149,7 @@ public class Client {
         public void run() {
             while(this.isRunning) {
                 if (!Client.this.clientMessages.empty()) {
-                    this.writeToServer((ClientMessage)Client.this.clientMessages.pop(), this.writer);
+                    this.writeToServer(Client.this.clientMessages.pop(), this.writer);
                 }
             }
 
