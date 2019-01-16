@@ -86,7 +86,7 @@ public class Client {
                                     else if (line.startsWith("/groups ")){
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.GRPS, "");
                                     }
-                                    else if (line.startsWith("/users ")){
+                                    else if (line.startsWith("/users")){
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.USRS, "");
                                     }
                                     else if (line.startsWith("/leave ")){
@@ -114,8 +114,17 @@ public class Client {
                                     if (received.getMessageType().equals(ServerMessage.MessageType.BCST)) {
                                         System.out.println(received.getPayload());
                                     }
-                                    if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
+                                    else if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
                                         System.out.println(received.getPayload());
+                                    }
+                                    else if (received.getMessageType().equals(ServerMessage.MessageType.USRS)) {
+                                        String message = received.getPayload();
+                                        String[] split = message.split(" ");
+                                        System.out.println("List of connected users:");
+                                        for (int i = 0; i < split.length; i++) {
+                                            System.out.println(split[i]);
+                                        }
+                                        System.out.println("--------");
                                     }
                                 }
                             }
