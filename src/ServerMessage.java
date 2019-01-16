@@ -48,11 +48,19 @@ public class ServerMessage {
     public static enum MessageType {
         HELO,
         BCST,
+        WISP,
+        KICK,
+        GRPS,
+        JOIN,
+        USRS,
+        LEVE,
+        CRTE,
         PING,
         DSCN,
         OK,
         ERR,
         UNKOWN;
+
 
         private MessageType() {
         }

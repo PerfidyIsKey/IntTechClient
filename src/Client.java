@@ -9,6 +9,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Scanner;
 import java.util.Stack;
@@ -28,6 +29,7 @@ public class Client {
     }
 
     public void start() {
+
         try {
             this.socket = new Socket(this.conf.getServerIp(), this.conf.getServerPort());
             InputStream is = this.socket.getInputStream();
@@ -64,12 +66,36 @@ public class Client {
                             System.out.println("Type a message: ");
                             this.nonblockReader = new NonblockingBufferedReader(new BufferedReader(new InputStreamReader(System.in)));
 
+
                             while(this.isConnected) {
                                 String line = this.nonblockReader.readLine();
                                 if (line != null) {
                                     ClientMessage clientMessage;
-                                    if (line.startsWith("/w")) {
+                                    if (line.startsWith("/whisper ")) {
+                                        line = line.replaceFirst("/whisper ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.WISP, line);
+                                    }
+                                    else if (line.startsWith("/kick ")){
+                                        line = line.replaceFirst("/kick ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.KICK, line);
+                                    }
+                                    else if (line.startsWith("/join ")){
+                                        line = line.replaceFirst("/join ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.JOIN, line);
+                                    }
+                                    else if (line.startsWith("/groups ")){
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.GRPS, "");
+                                    }
+                                    else if (line.startsWith("/users ")){
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.USRS, "");
+                                    }
+                                    else if (line.startsWith("/leave ")){
+                                        line = line.replaceFirst("/leave ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.LEVE, line);
+                                    }
+                                    else if (line.startsWith("/create ")){
+                                        line = line.replaceFirst("/create ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.CRTE, line);
                                     }
                                     else if (line.equals("quit")) {
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.QUIT, "");
@@ -86,6 +112,9 @@ public class Client {
                                 if (!this.serverMessages.empty()) {
                                     ServerMessage received = this.serverMessages.pop();
                                     if (received.getMessageType().equals(ServerMessage.MessageType.BCST)) {
+                                        System.out.println(received.getPayload());
+                                    }
+                                    if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
                                         System.out.println(received.getPayload());
                                     }
                                 }
