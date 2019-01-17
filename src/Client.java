@@ -83,8 +83,12 @@ public class Client {
                                         line = line.replaceFirst("/join ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.JOIN, line);
                                     }
-                                    else if (line.startsWith("/groups ")){
+                                    else if (line.startsWith("/groups")){
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.GRPS, "");
+                                    }
+                                    else if (line.startsWith("/group ")){
+                                        line = line.replaceFirst("/group ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.GRP, line);
                                     }
                                     else if (line.startsWith("/users")){
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.USRS, "");
@@ -117,10 +121,22 @@ public class Client {
                                     else if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
                                         System.out.println(received.getPayload());
                                     }
+                                    else if (received.getMessageType().equals(ServerMessage.MessageType.GRP)){
+                                        System.out.println(received.getPayload());
+                                    }
                                     else if (received.getMessageType().equals(ServerMessage.MessageType.USRS)) {
                                         String message = received.getPayload();
                                         String[] split = message.split(" ");
                                         System.out.println("List of connected users:");
+                                        for (int i = 0; i < split.length; i++) {
+                                            System.out.println(split[i]);
+                                        }
+                                        System.out.println("--------");
+                                    }
+                                    else if (received.getMessageType().equals(ServerMessage.MessageType.GRPS)) {
+                                        String message = received.getPayload();
+                                        String[] split = message.split(" ");
+                                        System.out.println("List of groups:");
                                         for (int i = 0; i < split.length; i++) {
                                             System.out.println(split[i]);
                                         }

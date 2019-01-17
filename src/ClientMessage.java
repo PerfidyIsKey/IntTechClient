@@ -20,6 +20,7 @@ public class ClientMessage {
         WISP,
         KICK,
         GRPS,
+        GRP,
         JOIN,
         USRS,
         LEVE,

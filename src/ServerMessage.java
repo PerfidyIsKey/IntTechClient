@@ -50,6 +50,8 @@ public class ServerMessage {
         BCST,
         WISP,
         USRS,
+        GRPS,
+        GRP,
         PING,
         DSCN,
         OK,
