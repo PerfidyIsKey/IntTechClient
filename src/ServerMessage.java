@@ -55,7 +55,11 @@ public class ServerMessage {
         PING,
         DSCN,
         OK,
+        SUC,
         ERR,
+        DATA,
+        SFILE,
+        RFILE,
         UNKOWN;
 
 

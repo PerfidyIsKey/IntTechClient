@@ -1,21 +1,19 @@
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.PrintWriter;
+import javax.print.DocFlavor;
+import java.io.*;
+import java.lang.reflect.Array;
+import java.lang.reflect.Proxy;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Scanner;
 import java.util.Stack;
 
 public class Client {
-    private ClientConfiguration conf;
+    public ClientConfiguration conf;
     private Socket socket;
     Client.MessageReader readerThread;
     Client.MessageWriter writerThread;
@@ -23,6 +21,8 @@ public class Client {
     NonblockingBufferedReader nonblockReader;
     private Stack<ClientMessage> clientMessages = new Stack();
     private Stack<ServerMessage> serverMessages = new Stack();
+    private String privateKey = "";
+    private String publicKey = "";
 
     public Client(ClientConfiguration conf) {
         this.conf = conf;
@@ -41,7 +41,7 @@ public class Client {
             this.writerThread = new Client.MessageWriter(writer);
             (new Thread(this.writerThread)).start();
 
-            while(true) {
+            while (true) {
                 if (!this.serverMessages.empty()) {
                     ServerMessage serverMessage = this.serverMessages.pop();
                     if (!serverMessage.getMessageType().equals(ServerMessage.MessageType.HELO)) {
@@ -53,7 +53,7 @@ public class Client {
                         ClientMessage heloMessage = new ClientMessage(ClientMessage.MessageType.HELO, username);
                         this.clientMessages.push(heloMessage);
 
-                        while(this.serverMessages.empty()) {
+                        while (this.serverMessages.empty()) {
 
                         }
 
@@ -67,41 +67,36 @@ public class Client {
                             this.nonblockReader = new NonblockingBufferedReader(new BufferedReader(new InputStreamReader(System.in)));
 
 
-                            while(this.isConnected) {
+                            while (this.isConnected) {
                                 String line = this.nonblockReader.readLine();
                                 if (line != null) {
                                     ClientMessage clientMessage;
                                     if (line.startsWith("/whisper ")) {
                                         line = line.replaceFirst("/whisper ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.WISP, line);
-                                    }
-                                    else if (line.startsWith("/kick ")){
+                                    } else if (line.startsWith("/kick ")) {
                                         line = line.replaceFirst("/kick ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.KICK, line);
-                                    }
-                                    else if (line.startsWith("/join ")){
+                                    } else if (line.startsWith("/join ")) {
                                         line = line.replaceFirst("/join ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.JOIN, line);
-                                    }
-                                    else if (line.startsWith("/groups")){
+                                    } else if (line.startsWith("/groups")) {
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.GRPS, "");
-                                    }
-                                    else if (line.startsWith("/group ")){
+                                    } else if (line.startsWith("/group ")) {
                                         line = line.replaceFirst("/group ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.GRP, line);
-                                    }
-                                    else if (line.startsWith("/users")){
+                                    } else if (line.startsWith("/users")) {
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.USRS, "");
-                                    }
-                                    else if (line.startsWith("/leave ")){
+                                    } else if (line.startsWith("/leave ")) {
                                         line = line.replaceFirst("/leave ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.LEVE, line);
-                                    }
-                                    else if (line.startsWith("/create ")){
+                                    } else if (line.startsWith("/create ")) {
                                         line = line.replaceFirst("/create ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.CRTE, line);
-                                    }
-                                    else if (line.equals("quit")) {
+                                    } else if (line.startsWith("/file ")) {
+                                        line = line.replaceFirst("/file ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.FILE, line);
+                                    } else if (line.startsWith("/quit")) {
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.QUIT, "");
                                         this.isConnected = false;
                                         Thread.sleep(500L);
@@ -110,21 +105,21 @@ public class Client {
                                     }
 
                                     this.clientMessages.push(clientMessage);
-                                    System.out.println("Type a message: ");
                                 }
 
                                 if (!this.serverMessages.empty()) {
                                     ServerMessage received = this.serverMessages.pop();
                                     if (received.getMessageType().equals(ServerMessage.MessageType.BCST)) {
                                         System.out.println(received.getPayload());
-                                    }
-                                    else if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.SUC)) {
                                         System.out.println(received.getPayload());
-                                    }
-                                    else if (received.getMessageType().equals(ServerMessage.MessageType.GRP)){
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.ERR)) {
                                         System.out.println(received.getPayload());
-                                    }
-                                    else if (received.getMessageType().equals(ServerMessage.MessageType.USRS)) {
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
+                                        System.out.println(received.getPayload());
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.GRP)) {
+                                        System.out.println(received.getPayload());
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.USRS)) {
                                         String message = received.getPayload();
                                         String[] split = message.split(" ");
                                         System.out.println("List of connected users:");
@@ -132,8 +127,7 @@ public class Client {
                                             System.out.println(split[i]);
                                         }
                                         System.out.println("--------");
-                                    }
-                                    else if (received.getMessageType().equals(ServerMessage.MessageType.GRPS)) {
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.GRPS)) {
                                         String message = received.getPayload();
                                         String[] split = message.split(" ");
                                         System.out.println("List of groups:");
@@ -141,6 +135,46 @@ public class Client {
                                             System.out.println(split[i]);
                                         }
                                         System.out.println("--------");
+                                    } else if(received.getMessageType().equals(ServerMessage.MessageType.SFILE)) {
+                                        String message = received.getPayload();
+                                        String[] split = message.split(" ");
+                                        String filename = split[1];
+                                        String port = split[2];
+                                        sendFile(filename, Integer.parseInt(port));
+                                    } else if(received.getMessageType().equals(ServerMessage.MessageType.RFILE)) {
+                                        String message = received.getPayload();
+                                        String[] split = message.split(" ");
+                                        String filename = split[1];
+                                        String port = split[2];
+                                        createFile(filename, Integer.parseInt(port));
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.DATA)) {
+                                        String message = received.getPayload();
+                                        String[] split = message.split(" ");
+                                        String filename = split[0];
+                                        String receivedBytes = message.replaceFirst(filename + " ", "");
+                                        FileWriter out = null;
+                                        boolean success = true;
+                                        try {
+                                            String home = System.getProperty("user.home");
+                                            out = new FileWriter(home + "/Downloads/" + filename);
+                                        } catch (FileNotFoundException ex) {
+                                            System.out.println("File not found. ");
+                                            success = false;
+                                        }
+                                        if (success) {
+                                            receivedBytes = receivedBytes.replace("[", "");
+                                            receivedBytes = receivedBytes.replace("]", "");
+                                            receivedBytes = receivedBytes.replace(" ", "");
+                                            String[] array = receivedBytes.split(",");
+
+                                            for (int i = 0; i < array.length; i++) {
+                                                int character = Integer.parseInt(array[i]);
+                                                out.write((char)character);
+                                            }
+
+                                            System.out.println("Received file: " + filename);
+                                            out.close();
+                                        }
                                     }
                                 }
                             }
@@ -158,6 +192,18 @@ public class Client {
             var12.printStackTrace();
         }
 
+    }
+
+    public void sendFile(String filename, int port) {
+        FileSendingThread thread = new FileSendingThread(this, port, filename);
+        Thread t1 = new Thread(thread);
+        t1.start();
+    }
+
+    public void createFile(String filename, int port){
+        FileReceivingThread thread = new FileReceivingThread(this, port, filename);
+        Thread t1 = new Thread(thread);
+        t1.start();
     }
 
     private boolean validateServerMessage(ClientMessage clientMessage, ServerMessage serverMessage) {
@@ -201,7 +247,7 @@ public class Client {
         }
 
         public void run() {
-            while(this.isRunning) {
+            while (this.isRunning) {
                 if (!Client.this.clientMessages.empty()) {
                     this.writeToServer(Client.this.clientMessages.pop(), this.writer);
                 }
@@ -244,7 +290,7 @@ public class Client {
         public void run() {
             int receiveNull = 0;
 
-            while(this.isRunning) {
+            while (this.isRunning) {
                 String line = this.readFromServer(this.reader);
                 if (line == null) {
                     ++receiveNull;

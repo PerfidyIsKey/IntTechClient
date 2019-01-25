@@ -10,7 +10,7 @@ public class ClientConfiguration {
     private String serverIp = "127.0.0.1";
     private int serverPort = 1337;
     private boolean showColors = true;
-    private boolean showLogging = true;
+    private boolean showLogging = false;
 
     public ClientConfiguration() {
     }

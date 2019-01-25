@@ -25,6 +25,8 @@ public class ClientMessage {
         USRS,
         LEVE,
         CRTE,
+        FILE,
+        DATA,
         QUIT;
 
         private MessageType() {
