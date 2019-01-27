@@ -26,7 +26,8 @@ public class ClientMessage {
         LEVE,
         CRTE,
         FILE,
-        DATA,
+        KEY,
+        ASK,
         QUIT;
 
         private MessageType() {

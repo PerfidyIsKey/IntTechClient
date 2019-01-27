@@ -60,6 +60,7 @@ public class ServerMessage {
         DATA,
         SFILE,
         RFILE,
+        KEY,
         UNKOWN;
 
 

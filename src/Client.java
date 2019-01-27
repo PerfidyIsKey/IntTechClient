@@ -1,13 +1,17 @@
 
-import javax.print.DocFlavor;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.*;
-import java.lang.reflect.Array;
-import java.lang.reflect.Proxy;
+
 import java.net.Socket;
-import java.net.SocketAddress;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
+
+import java.security.*;
+
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Scanner;
 import java.util.Stack;
@@ -21,15 +25,17 @@ public class Client {
     NonblockingBufferedReader nonblockReader;
     private Stack<ClientMessage> clientMessages = new Stack();
     private Stack<ServerMessage> serverMessages = new Stack();
-    private String privateKey = "";
-    private String publicKey = "";
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
+    private String publicKeyString;
+    private String whisperMessage;
 
     public Client(ClientConfiguration conf) {
         this.conf = conf;
     }
 
     public void start() {
-
+    generateKeys();
         try {
             this.socket = new Socket(this.conf.getServerIp(), this.conf.getServerPort());
             InputStream is = this.socket.getInputStream();
@@ -64,6 +70,8 @@ public class Client {
                             System.out.println("Successfully connected to server.");
                             System.out.println("(Type 'quit' to close connection and stop application.)");
                             System.out.println("Type a message: ");
+                            ClientMessage keyMessage = new ClientMessage(ClientMessage.MessageType.KEY, getPublicKeyString());
+                            this.clientMessages.push(keyMessage);
                             this.nonblockReader = new NonblockingBufferedReader(new BufferedReader(new InputStreamReader(System.in)));
 
 
@@ -73,7 +81,10 @@ public class Client {
                                     ClientMessage clientMessage;
                                     if (line.startsWith("/whisper ")) {
                                         line = line.replaceFirst("/whisper ", "");
-                                        clientMessage = new ClientMessage(ClientMessage.MessageType.WISP, line);
+                                        String[] split = line.split(" ");
+                                        String targetName = split[0];
+                                        whisperMessage = line.replaceFirst(targetName + " ", "");
+                                        clientMessage = new ClientMessage(ClientMessage.MessageType.ASK, targetName);
                                     } else if (line.startsWith("/kick ")) {
                                         line = line.replaceFirst("/kick ", "");
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.KICK, line);
@@ -116,7 +127,8 @@ public class Client {
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.ERR)) {
                                         System.out.println(received.getPayload());
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
-                                        System.out.println(received.getPayload());
+                                        String message = decryptMessage(received.getPayload());
+                                        System.out.println(message);
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.GRP)) {
                                         System.out.println(received.getPayload());
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.USRS)) {
@@ -138,43 +150,22 @@ public class Client {
                                     } else if(received.getMessageType().equals(ServerMessage.MessageType.SFILE)) {
                                         String message = received.getPayload();
                                         String[] split = message.split(" ");
-                                        String filename = split[1];
-                                        String port = split[2];
+                                        String filename = split[0];
+                                        String port = split[1];
                                         sendFile(filename, Integer.parseInt(port));
                                     } else if(received.getMessageType().equals(ServerMessage.MessageType.RFILE)) {
                                         String message = received.getPayload();
                                         String[] split = message.split(" ");
-                                        String filename = split[1];
-                                        String port = split[2];
-                                        createFile(filename, Integer.parseInt(port));
-                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.DATA)) {
-                                        String message = received.getPayload();
-                                        String[] split = message.split(" ");
                                         String filename = split[0];
-                                        String receivedBytes = message.replaceFirst(filename + " ", "");
-                                        FileWriter out = null;
-                                        boolean success = true;
-                                        try {
-                                            String home = System.getProperty("user.home");
-                                            out = new FileWriter(home + "/Downloads/" + filename);
-                                        } catch (FileNotFoundException ex) {
-                                            System.out.println("File not found. ");
-                                            success = false;
-                                        }
-                                        if (success) {
-                                            receivedBytes = receivedBytes.replace("[", "");
-                                            receivedBytes = receivedBytes.replace("]", "");
-                                            receivedBytes = receivedBytes.replace(" ", "");
-                                            String[] array = receivedBytes.split(",");
+                                        String port = split[1];
+                                        createFile(filename, Integer.parseInt(port));
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.KEY)) {
+                                        String publicKey = received.getPayload();
+                                        String message = encryptMessage(line, publicKey);
 
-                                            for (int i = 0; i < array.length; i++) {
-                                                int character = Integer.parseInt(array[i]);
-                                                out.write((char)character);
-                                            }
+                                        ClientMessage clientMessage = new ClientMessage(ClientMessage.MessageType.WISP, message);
+                                        clientMessages.push(clientMessage);
 
-                                            System.out.println("Received file: " + filename);
-                                            out.close();
-                                        }
                                     }
                                 }
                             }
@@ -205,6 +196,110 @@ public class Client {
         Thread t1 = new Thread(thread);
         t1.start();
     }
+
+    public void generateKeys(){
+        KeyPairGenerator keyGen = null;
+        try {
+            keyGen = KeyPairGenerator.getInstance("RSA");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        SecureRandom random = null;
+        try {
+            random = SecureRandom.getInstance("SHA1PRNG");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        keyGen.initialize(1024, random);
+        KeyPair pair = keyGen.generateKeyPair();
+        privateKey = pair.getPrivate();
+        publicKey = pair.getPublic();
+    }
+
+    public String encryptMessage(String message, String publicKey){
+        //@TODO fix the transfer of publickey.
+        byte bit = Byte.valueOf(publicKey);
+        System.out.println(Byte.valueOf(publicKey));
+        byte[] key = publicKey.getBytes();
+        Cipher cipher = null;
+        PublicKey pKey = null;
+
+        try {
+            cipher = Cipher.getInstance("RSA");
+            pKey = KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(key));
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, pKey);
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+        byte[] messageBytes = null;
+        try {
+            messageBytes = cipher.doFinal(message.getBytes());
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        }
+
+        message = messageBytes.toString();
+
+        return message;
+    }
+
+    public String decryptMessage(String message){
+
+        Cipher cipher = null;
+        PrivateKey pKey = getPrivateKey();
+
+        try {
+            cipher = Cipher.getInstance("RSA");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, pKey);
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+        byte[] messageBytes = null;
+        try {
+            messageBytes = cipher.doFinal(message.getBytes());
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        }
+
+        message = messageBytes.toString();
+
+        return message;
+    }
+
+    public PrivateKey getPrivateKey() {
+        return privateKey;
+    }
+
+    public PublicKey getPublicKey() {
+        return publicKey;
+    }
+
+    public String getPublicKeyString(){
+        publicKeyString = publicKey.getEncoded().toString();
+        return publicKeyString;
+    }
+
 
     private boolean validateServerMessage(ClientMessage clientMessage, ServerMessage serverMessage) {
         boolean isValid = false;

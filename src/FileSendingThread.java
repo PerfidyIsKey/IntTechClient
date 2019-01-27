@@ -22,9 +22,10 @@ public class FileSendingThread implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        String home = System.getProperty("user.home");
 
-        File file = new File("./src/" + filename);
-        byte[] bytes = new byte[16 * 1024];
+        File file = new File(home + "/Downloads/" + filename);
+        byte[] bytes = new byte[1024];
         InputStream in = null;
         try {
             in = new FileInputStream(file);
@@ -33,9 +34,18 @@ public class FileSendingThread implements Runnable {
         }
 
         try {
-            if (in.read(bytes) > 0) {
-                socket.getOutputStream().write(bytes);
+            while (in.available() != 0) {
+                if (in.read(bytes) > 0) {
+                    socket.getOutputStream().write(bytes);
+                }
             }
+            System.out.println("File " + filename + " sent.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            in.close();
+            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

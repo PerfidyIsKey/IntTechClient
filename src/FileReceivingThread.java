@@ -29,10 +29,16 @@ public class FileReceivingThread implements Runnable {
             e.printStackTrace();
         }
         String home = System.getProperty("user.home");
+        System.out.println(filename);
+        String[] split = filename.split("\\.");
+        String suffix = split[1];
+        String name = split[0];
+        name = name + "(new)";
+        filename = name + "." + suffix;
 
         File file = new File(home + "/Downloads/" + filename);
 
-        byte[] bytes = new byte[16 * 1024];
+        byte[] bytes = new byte[1024];
         OutputStream out = null;
         try {
             out = new FileOutputStream(file);
@@ -42,9 +48,22 @@ public class FileReceivingThread implements Runnable {
 
 
         try {
-            if(in.read(bytes) > 0){
-                out.write(bytes);
+            while (in.available() != 0) {
+                if (in.read(bytes) > 0) {
+                    out.write(bytes);
+                }
             }
+            System.out.println("File " + filename + " received.");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        try {
+            in.close();
+            out.close();
+            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
