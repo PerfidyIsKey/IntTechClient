@@ -17,7 +17,6 @@ public class ClientMessage {
         HELO,
         BCST,
         PONG,
-        WISP,
         KICK,
         GRPS,
         GRP,
@@ -26,7 +25,7 @@ public class ClientMessage {
         LEVE,
         CRTE,
         FILE,
-        KEY,
+        KEYP,
         ASK,
         QUIT;
 

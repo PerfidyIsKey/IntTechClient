@@ -8,9 +8,12 @@ import java.io.*;
 
 import java.net.Socket;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Scanner;
@@ -27,7 +30,6 @@ public class Client {
     private Stack<ServerMessage> serverMessages = new Stack();
     private PrivateKey privateKey;
     private PublicKey publicKey;
-    private String publicKeyString;
     private String whisperMessage;
 
     public Client(ClientConfiguration conf) {
@@ -67,11 +69,16 @@ public class Client {
                         if (!this.isConnected) {
                             System.out.println("Error logging into server");
                         } else {
+
+                            ClientMessage keyMessage = new ClientMessage(ClientMessage.MessageType.KEYP, "");
+                            clientMessages.push(keyMessage);
+
+
                             System.out.println("Successfully connected to server.");
                             System.out.println("(Type 'quit' to close connection and stop application.)");
                             System.out.println("Type a message: ");
-                            ClientMessage keyMessage = new ClientMessage(ClientMessage.MessageType.KEY, getPublicKeyString());
-                            this.clientMessages.push(keyMessage);
+
+
                             this.nonblockReader = new NonblockingBufferedReader(new BufferedReader(new InputStreamReader(System.in)));
 
 
@@ -84,6 +91,7 @@ public class Client {
                                         String[] split = line.split(" ");
                                         String targetName = split[0];
                                         whisperMessage = line.replaceFirst(targetName + " ", "");
+                                        whisperMessage = "From " + username + ": " + whisperMessage;
                                         clientMessage = new ClientMessage(ClientMessage.MessageType.ASK, targetName);
                                     } else if (line.startsWith("/kick ")) {
                                         line = line.replaceFirst("/kick ", "");
@@ -126,9 +134,6 @@ public class Client {
                                         System.out.println(received.getPayload());
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.ERR)) {
                                         System.out.println(received.getPayload());
-                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.WISP)) {
-                                        String message = decryptMessage(received.getPayload());
-                                        System.out.println(message);
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.GRP)) {
                                         System.out.println(received.getPayload());
                                     } else if (received.getMessageType().equals(ServerMessage.MessageType.USRS)) {
@@ -159,13 +164,63 @@ public class Client {
                                         String filename = split[0];
                                         String port = split[1];
                                         createFile(filename, Integer.parseInt(port));
-                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.KEY)) {
-                                        String publicKey = received.getPayload();
-                                        String message = encryptMessage(line, publicKey);
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.KEYPR)) {
+                                        String port = received.getPayload();
 
-                                        ClientMessage clientMessage = new ClientMessage(ClientMessage.MessageType.WISP, message);
-                                        clientMessages.push(clientMessage);
+                                        Socket socket = null;
+                                        try {
+                                            socket = new Socket(this.conf.getServerIp(), Integer.parseInt(port));
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+                                        InputStream in = socket.getInputStream();
+                                        OutputStream out = socket.getOutputStream();
 
+                                        byte[] publicKey = new byte[1024];
+
+                                        byte[] message;
+                                        while (in.available() == 0){
+
+                                        }
+                                        while(in.available() != 0) {
+                                            if (in.read(publicKey) > 0) {
+                                                message = encryptMessage(whisperMessage, publicKey);
+                                                out.write(message);
+                                            }
+                                        }
+                                    } else if (received.getMessageType().equals(ServerMessage.MessageType.KEYPS)) {
+                                        String port = received.getPayload();
+
+                                        Socket socket = null;
+                                        try {
+                                            socket = new Socket(this.conf.getServerIp(), Integer.parseInt(port));
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+                                        OutputStream out = socket.getOutputStream();
+                                        out.write(getPublicKeyBytes());
+                                    } else if(received.getMessageType().equals(ServerMessage.MessageType.WISPP)){
+                                        String port = received.getPayload();
+
+                                        Socket socket = null;
+                                        try {
+                                            socket = new Socket(this.conf.getServerIp(), Integer.parseInt(port));
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+                                        InputStream in = socket.getInputStream();
+                                        byte[] messageBytes = new byte[128];
+                                        String message;
+                                        while (in.available() == 0){
+
+                                        }
+                                        while(in.available() != 0) {
+                                            if (in.read(messageBytes) > 0) {
+
+                                            }
+                                        }
+                                        message = decryptMessage(messageBytes);
+                                        System.out.println(message);
                                     }
                                 }
                             }
@@ -216,11 +271,8 @@ public class Client {
         publicKey = pair.getPublic();
     }
 
-    public String encryptMessage(String message, String publicKey){
-        //@TODO fix the transfer of publickey.
-        byte bit = Byte.valueOf(publicKey);
-        System.out.println(Byte.valueOf(publicKey));
-        byte[] key = publicKey.getBytes();
+    public byte[] encryptMessage(String message, byte[] key){
+
         Cipher cipher = null;
         PublicKey pKey = null;
 
@@ -243,48 +295,51 @@ public class Client {
         }
         byte[] messageBytes = null;
         try {
-            messageBytes = cipher.doFinal(message.getBytes());
+            Charset charset = StandardCharsets.US_ASCII;
+
+            byte[] byteArray = charset.encode(message).array();
+            messageBytes = cipher.doFinal(byteArray);
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         } catch (BadPaddingException e) {
             e.printStackTrace();
         }
 
-        message = messageBytes.toString();
-
-        return message;
+        return messageBytes;
     }
 
-    public String decryptMessage(String message){
+    public String decryptMessage(byte[] message){
 
         Cipher cipher = null;
-        PrivateKey pKey = getPrivateKey();
+        byte[] key = getPrivateKey().getEncoded();
+        PrivateKey privateKey = null;
 
         try {
+            privateKey = KeyFactory.getInstance("RSA")
+                    .generatePrivate(new PKCS8EncodedKeySpec(key));
             cipher = Cipher.getInstance("RSA");
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
         }
 
         try {
-            cipher.init(Cipher.DECRYPT_MODE, pKey);
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
-        byte[] messageBytes = null;
+        byte[] messageBytes = new byte[128];
         try {
-            messageBytes = cipher.doFinal(message.getBytes());
+            messageBytes = cipher.doFinal(message);
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         } catch (BadPaddingException e) {
             e.printStackTrace();
         }
-
-        message = messageBytes.toString();
-
-        return message;
+        return new String(messageBytes);
     }
 
     public PrivateKey getPrivateKey() {
@@ -295,9 +350,8 @@ public class Client {
         return publicKey;
     }
 
-    public String getPublicKeyString(){
-        publicKeyString = publicKey.getEncoded().toString();
-        return publicKeyString;
+    public byte[] getPublicKeyBytes(){
+        return publicKey.getEncoded();
     }
 
 

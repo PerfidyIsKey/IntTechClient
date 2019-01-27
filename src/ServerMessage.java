@@ -48,7 +48,7 @@ public class ServerMessage {
     public static enum MessageType {
         HELO,
         BCST,
-        WISP,
+        WISPP,
         USRS,
         GRPS,
         GRP,
@@ -57,10 +57,10 @@ public class ServerMessage {
         OK,
         SUC,
         ERR,
-        DATA,
         SFILE,
         RFILE,
-        KEY,
+        KEYPS,
+        KEYPR,
         UNKOWN;
 
 
